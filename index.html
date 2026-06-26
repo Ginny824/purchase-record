@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>採購記錄系統</title>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;background:#f0f2f5;color:#1a1a1a;max-width:640px;margin:0 auto;min-height:100vh}
+
+.hd{background:#1e3a5f;color:#fff;padding:14px 20px;text-align:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.hd h1{font-size:17px;font-weight:700}
+.hd p{font-size:12px;opacity:.7;margin-top:2px}
+
+.list{padding:16px;padding-bottom:90px}
+.empty{text-align:center;padding:60px 20px;color:#aaa}
+.empty .ei{font-size:44px;margin-bottom:12px}
+
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.07);display:flex;gap:12px;position:relative}
+.card img{width:80px;height:80px;border-radius:10px;object-fit:cover;flex-shrink:0}
+.ci{flex:1;overflow:hidden;min-width:0}
+.ci-code{font-size:15px;font-weight:700;color:#1e3a5f}
+.ci-meta{font-size:12px;color:#777;margin-top:3px;line-height:1.8}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.tag{background:#f0f4fa;color:#555;font-size:11px;padding:3px 8px;border-radius:6px}
+.btn-del{position:absolute;top:10px;right:10px;background:#ff4444;color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+
+.bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:640px;padding:12px 16px;background:#fff;border-top:1px solid #e8e8e8;display:flex;gap:12px;z-index:100}
+.btn-blue{flex:1;padding:13px;background:#3b7dd8;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer}
+.btn-green{flex:1;padding:13px;background:#27ae60;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer}
+.btn-green:disabled{background:#b0bec5;cursor:not-allowed}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.overlay.open{display:block}
+.mbox{background:#fff;margin:20px auto;max-width:600px;border-radius:18px;overflow:hidden}
+.mhd{background:#1e3a5f;color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center}
+.mhd h2{font-size:16px;font-weight:600}
+.btn-x{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px;line-height:1}
+.mbody{padding:20px}
+
+.fg{margin-bottom:18px}
+.fl{display:block;font-size:13px;font-weight:600;color:#444;margin-bottom:7px}
+.fl.req::after{content:' *';color:#e74c3c}
+input[type=text],input[type=number],textarea,select{width:100%;padding:11px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:15px;color:#222;background:#fff;transition:border-color .15s;-webkit-appearance:none;appearance:none;font-family:inherit}
+textarea{resize:vertical;min-height:70px}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#3b7dd8}
+input.err,select.err,textarea.err{border-color:#e74c3c!important}
+.em{color:#e74c3c;font-size:12px;margin-top:5px;display:none}
+
+.pzone{border:2px dashed #ccc;border-radius:14px;padding:22px 16px;text-align:center;cursor:pointer;transition:border-color .2s;background:#fafafa}
+.pzone:hover{border-color:#3b7dd8}
+.pzone img{max-width:100%;max-height:180px;border-radius:10px;object-fit:contain;display:none}
+.pzt{color:#aaa;font-size:14px}
+.pzt .pi{font-size:32px;margin-bottom:6px}
+
+.codebox{background:#f0f6ff;border:1.5px solid #3b7dd8;border-radius:10px;padding:13px;text-align:center;font-size:22px;font-weight:700;letter-spacing:4px;color:#1e3a5f}
+
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.btn-ok{width:100%;padding:14px;background:#27ae60;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-top:10px}
+.btn-ok:active{opacity:.85}
+
+.loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:#fff;font-size:15px}
+.loading.show{display:flex}
+.spin{width:40px;height:40px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <h1>採購記錄系統</h1>
+  <p id="hdCount">尚無商品</p>
+</div>
+
+<div class="list" id="listWrap">
+  <div class="empty" id="emptyState">
+    <div class="ei">📦</div>
+    <div style="font-size:15px;font-weight:600">尚未新增商品</div>
+    <div style="font-size:13px;margin-top:6px">點選下方「新增商品」開始記錄</div>
+  </div>
+</div>
+
+<div class="bar">
+  <button class="btn-blue" onclick="openModal()">＋ 新增商品</button>
+  <button class="btn-green" id="btnSubmit" disabled onclick="doExport()">完成送出</button>
+</div>
+
+<!-- 新增商品 Modal -->
+<div class="overlay" id="overlay">
+  <div class="mbox">
+    <div class="mhd">
+      <h2>新增商品</h2>
+      <button class="btn-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="mbody">
+
+      <!-- 1. 照片 -->
+      <div class="fg">
+        <label class="fl req">款示圖</label>
+        <div class="pzone" id="pzone" onclick="document.getElementById('fileIn').click()">
+          <img id="pimg" alt="">
+          <div class="pzt" id="pzt"><div class="pi">📷</div><div>點此拍照或選圖</div></div>
+        </div>
+        <input type="file" id="fileIn" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+        <div class="em" id="ePhoto">請上傳商品照片</div>
+      </div>
+
+      <!-- 2. 季別 -->
+      <div class="fg">
+        <label class="fl req">季別（2碼數字）</label>
+        <input type="text" id="inSeason" maxlength="2" inputmode="numeric" placeholder="例：64" oninput="refreshCode()">
+        <div class="em" id="eSeason">請輸入正確的 2 碼數字（0–9）</div>
+      </div>
+
+      <!-- 3. 類別 -->
+      <div class="fg">
+        <label class="fl req">商品類別</label>
+        <select id="inCat" onchange="refreshCode()">
+          <option value="">— 請選擇 —</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+        <div class="em" id="eCat">請選擇商品類別</div>
+      </div>
+
+      <!-- 4. 商品編碼 -->
+      <div class="fg">
+        <label class="fl">商品編碼（自動產生）</label>
+        <div class="codebox" id="codebox">— — — — — — — —</div>
+      </div>
+
+      <!-- 5 & 6. 顏色 / 尺寸 -->
+      <div class="row2">
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl req">顏色</label>
+          <input type="text" id="inColor" placeholder="例：深藍">
+          <div class="em" id="eColor">請輸入顏色</div>
+        </div>
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl req">尺寸</label>
+          <input type="text" id="inSize" placeholder="例：F">
+          <div class="em" id="eSize">請輸入尺寸</div>
+        </div>
+      </div>
+      <div style="margin-bottom:18px"></div>
+
+      <!-- 7. 成分 -->
+      <div class="fg">
+        <label class="fl req">成分</label>
+        <input type="text" id="inComp" placeholder="例：C 85% P 15%">
+        <div class="em" id="eComp">請輸入成分</div>
+      </div>
+
+      <!-- 8 & 9. 成本 / 下單件數 -->
+      <div class="row2">
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl req">成本</label>
+          <input type="number" id="inCost" inputmode="numeric" placeholder="例：59000">
+          <div class="em" id="eCost">請輸入成本</div>
+        </div>
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl req">下單件數</label>
+          <input type="number" id="inQty" inputmode="numeric" placeholder="例：5" min="1">
+          <div class="em" id="eQty">請輸入件數</div>
+        </div>
+      </div>
+      <div style="margin-bottom:18px"></div>
+
+      <!-- 10. 檔口號 -->
+      <div class="fg">
+        <label class="fl req">檔口號</label>
+        <input type="text" id="inBooth" placeholder="例：APM W and J 259">
+        <div class="em" id="eBooth">請輸入檔口號</div>
+      </div>
+
+      <!-- 11. 備註 -->
+      <div class="fg">
+        <label class="fl">備註（選填）</label>
+        <textarea id="inNote" placeholder="如有特殊備註請填寫..."></textarea>
+      </div>
+
+      <button class="btn-ok" onclick="addProduct()">✓ 確認新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div class="loading" id="loading">
+  <div class="spin"></div>
+  <div>正在產生 Excel，請稍候...</div>
+</div>
+
+<script>
+// ── State ──
+let products = [];
+let photoB64 = null;
+let photoExt = 'jpeg';
+
+// ── Serial number (localStorage，跨次累積) ──
+function peekSN(season, cat) {
+  return String(parseInt(localStorage.getItem('sn_'+season+'_'+cat)||'0') + 1).padStart(3,'0');
+}
+function useSN(season, cat) {
+  const key = 'sn_'+season+'_'+cat;
+  const n = parseInt(localStorage.getItem(key)||'0') + 1;
+  localStorage.setItem(key, String(n));
+  return String(n).padStart(3,'0');
+}
+
+// ── Code preview ──
+function refreshCode() {
+  const s = document.getElementById('inSeason').value;
+  const c = document.getElementById('inCat').value;
+  document.getElementById('codebox').textContent =
+    (/^\d{2}$/.test(s) && c !== '') ? '41'+s+c+peekSN(s,c) : '— — — — — — — —';
+}
+
+// ── Photo ──
+function onPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  photoExt = file.type.includes('png') ? 'png' : 'jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    photoB64 = e.target.result.split(',')[1];
+    const img = document.getElementById('pimg');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.getElementById('pzt').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Modal ──
+function openModal() {
+  resetForm();
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('overlay').scrollTop = 0;
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+}
+function resetForm() {
+  photoB64 = null; photoExt = 'jpeg';
+  document.getElementById('fileIn').value = '';
+  const img = document.getElementById('pimg');
+  img.src = ''; img.style.display = 'none';
+  document.getElementById('pzt').style.display = 'block';
+  ['inSeason','inColor','inSize','inComp','inCost','inQty','inBooth','inNote'].forEach(
+    id => document.getElementById(id).value = ''
+  );
+  document.getElementById('inCat').value = '';
+  document.getElementById('codebox').textContent = '— — — — — — — —';
+  document.querySelectorAll('.em').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('input.err,select.err,textarea.err').forEach(el => el.classList.remove('err'));
+}
+
+// ── Validation ──
+function validate() {
+  let ok = true;
+  const show = (id, bad) => {
+    document.getElementById(id).style.display = bad ? 'block' : 'none';
+    if (bad) ok = false;
+  };
+
+  show('ePhoto', !photoB64);
+
+  const s = document.getElementById('inSeason').value;
+  const sOk = /^\d{2}$/.test(s);
+  show('eSeason', !sOk);
+  document.getElementById('inSeason').classList.toggle('err', !sOk);
+
+  const c = document.getElementById('inCat').value;
+  show('eCat', !c);
+  document.getElementById('inCat').classList.toggle('err', !c);
+
+  const fields = [
+    ['inColor','eColor'],['inSize','eSize'],['inComp','eComp'],
+    ['inBooth','eBooth'],
+  ];
+  fields.forEach(([fid, eid]) => {
+    const bad = !document.getElementById(fid).value.trim();
+    show(eid, bad);
+    document.getElementById(fid).classList.toggle('err', bad);
+  });
+
+  const cost = document.getElementById('inCost').value;
+  const costOk = cost && !isNaN(cost) && Number(cost) > 0;
+  show('eCost', !costOk);
+  document.getElementById('inCost').classList.toggle('err', !costOk);
+
+  const qty = document.getElementById('inQty').value;
+  const qtyOk = qty && !isNaN(qty) && Number(qty) >= 1;
+  show('eQty', !qtyOk);
+  document.getElementById('inQty').classList.toggle('err', !qtyOk);
+
+  return ok;
+}
+
+// ── Add product ──
+function addProduct() {
+  if (!validate()) return;
+  const season = document.getElementById('inSeason').value;
+  const cat    = document.getElementById('inCat').value;
+  const sn     = useSN(season, cat);
+  const code   = '41' + season + cat + sn;
+  const cost   = parseInt(document.getElementById('inCost').value);
+  const qty    = parseInt(document.getElementById('inQty').value);
+
+  products.push({
+    id: Date.now(), code,
+    photoB64, photoExt,
+    photoSrc: 'data:image/'+photoExt+';base64,'+photoB64,
+    color:  document.getElementById('inColor').value.trim(),
+    size:   document.getElementById('inSize').value.trim(),
+    comp:   document.getElementById('inComp').value.trim(),
+    cost, qty,
+    total:  cost * qty,
+    booth:  document.getElementById('inBooth').value.trim(),
+    note:   document.getElementById('inNote').value.trim(),
+  });
+
+  renderList();
+  closeModal();
+}
+
+// ── Render list ──
+function renderList() {
+  const wrap = document.getElementById('listWrap');
+  wrap.querySelectorAll('.card').forEach(c => c.remove());
+  const empty = document.getElementById('emptyState');
+
+  if (!products.length) {
+    empty.style.display = 'block';
+    document.getElementById('hdCount').textContent = '尚無商品';
+    document.getElementById('btnSubmit').disabled = true;
+    return;
+  }
+  empty.style.display = 'none';
+  document.getElementById('hdCount').textContent = '共 ' + products.length + ' 款';
+  document.getElementById('btnSubmit').disabled = false;
+
+  products.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML =
+      '<img src="'+p.photoSrc+'" alt="">'+
+      '<div class="ci">'+
+        '<div class="ci-code">'+(i+1)+'. '+p.code+'</div>'+
+        '<div class="ci-meta">'+
+          '檔口：'+p.booth+'<br>'+
+          '顏色：'+p.color+' ／ 尺寸：'+p.size+'<br>'+
+          '成本：'+p.cost.toLocaleString()+' ／ 件數：'+p.qty+' ／ 合計：'+p.total.toLocaleString()+'<br>'+
+          '成分：'+p.comp+
+          (p.note ? '<br>備註：'+p.note : '')+
+        '</div>'+
+      '</div>'+
+      '<button class="btn-del" onclick="delProduct('+p.id+')">✕</button>';
+    wrap.appendChild(card);
+  });
+}
+
+function delProduct(id) {
+  if (!confirm('確定刪除這款商品？')) return;
+  products = products.filter(p => p.id !== id);
+  renderList();
+}
+
+// ── Export Excel ──
+async function doExport() {
+  if (!products.length) return;
+  document.getElementById('loading').classList.add('show');
+  try {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('採購記錄', {views:[{state:'frozen', ySplit:1}]});
+
+    // A  B     C   D     E   F   G    H     I   J    K   L   M
+    ws.columns = [
+      {width:5},{width:18},{width:13},{width:18},
+      {width:10},{width:8},{width:10},{width:10},
+      {width:13},{width:14},{width:12},{width:16},{width:20},
+    ];
+
+    // ── Header row ──
+    const HDRS = ['編','檔口號','貨號','款示圖','顏色','尺寸','訂貨件數','實際出貨','成本','總金額','價格','成分','備註'];
+    const hRow = ws.getRow(1);
+    hRow.height = 28;
+    HDRS.forEach((h, i) => {
+      const cell = hRow.getCell(i+1);
+      cell.value = h;
+      cell.font  = {bold:true, size:11, color:{argb: i===7 ? 'FFCC0000' : 'FF000000'}};
+      cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+      cell.fill  = {type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'}};
+      cell.border = bd();
+    });
+    ws.autoFilter = {from:'A1', to:'M1'};
+
+    const ROW_H = 80; // points — tall enough for photo thumbnail
+
+    // ── Data rows ──
+    products.forEach((p, pi) => {
+      const r = ws.getRow(pi + 2);
+      r.height = ROW_H;
+
+      r.getCell(1).value  = pi + 1;         // A 編
+      r.getCell(2).value  = p.booth;        // B 檔口號
+      r.getCell(3).value  = p.code;         // C 貨號
+      // D 款示圖 → image added below
+      r.getCell(5).value  = p.color;        // E 顏色
+      r.getCell(6).value  = p.size;         // F 尺寸
+      r.getCell(7).value  = p.qty;          // G 訂貨件數
+      r.getCell(8).value  = '';             // H 實際出貨（留空）
+      r.getCell(9).value  = p.cost;         // I 成本
+      r.getCell(9).numFmt = '₩#,##0';
+      r.getCell(10).value  = p.total;       // J 總金額
+      r.getCell(10).numFmt = '₩#,##0';
+      r.getCell(11).value  = '';            // K 價格（留空）
+      r.getCell(12).value  = p.comp;        // L 成分
+      r.getCell(13).value  = p.note || '';  // M 備註
+
+      // Style all cells
+      for (let col=1; col<=13; col++) {
+        const cell = r.getCell(col);
+        cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+        cell.fill   = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFCE4D6'}};
+        cell.border = bd();
+      }
+      // 編 = yellow
+      r.getCell(1).fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFFFF00'}};
+      // H red font
+      r.getCell(8).font = {color:{argb:'FFCC0000'}};
+
+      // Embed photo in D column (0-indexed: col 3, row pi+1)
+      const imgId = wb.addImage({
+        base64: p.photoB64,
+        extension: p.photoExt === 'png' ? 'png' : 'jpeg',
+      });
+      ws.addImage(imgId, {
+        tl: {col: 3, row: pi + 1},
+        br: {col: 4, row: pi + 2},
+        editAs: 'oneCell',
+      });
+    });
+
+    // ── Download ──
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const d  = new Date();
+    const ds = d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+    saveAs(blob, '採購記錄_'+ds+'.xlsx');
+  } catch(e) {
+    alert('產生 Excel 時發生錯誤：' + e.message);
+    console.error(e);
+  } finally {
+    document.getElementById('loading').classList.remove('show');
+  }
+}
+
+function bd() {
+  const s = {style:'thin', color:{argb:'FFB0B0B0'}};
+  return {top:s, bottom:s, left:s, right:s};
+}
+</script>
+</body>
+</html>

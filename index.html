@@ -100,18 +100,26 @@ input.err,select.err,textarea.err{border-color:#e74c3c!important}
       <!-- 1. 照片 -->
       <div class="fg">
         <label class="fl req">款示圖</label>
-        <div class="pzone" id="pzone" onclick="document.getElementById('fileIn').click()">
+        <div class="pzone" id="pzone">
           <img id="pimg" alt="">
-          <div class="pzt" id="pzt"><div class="pi">📷</div><div>點此拍照或選圖</div></div>
+          <div class="pzt" id="pzt">
+            <div class="pi">🖼️</div>
+            <div style="margin-bottom:12px;font-size:13px">選擇上傳方式</div>
+            <div style="display:flex;gap:10px;justify-content:center">
+              <button type="button" onclick="document.getElementById('fileCamera').click()" style="flex:1;padding:10px;background:#3b7dd8;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">📷 拍照</button>
+              <button type="button" onclick="document.getElementById('fileAlbum').click()" style="flex:1;padding:10px;background:#6c757d;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer">🖼 相冊</button>
+            </div>
+          </div>
         </div>
-        <input type="file" id="fileIn" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+        <input type="file" id="fileCamera" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+        <input type="file" id="fileAlbum"  accept="image/*" style="display:none" onchange="onPhoto(this)">
         <div class="em" id="ePhoto">請上傳商品照片</div>
       </div>
 
       <!-- 2. 季別 -->
       <div class="fg">
         <label class="fl req">季別（2碼數字）</label>
-        <input type="text" id="inSeason" maxlength="2" inputmode="numeric" placeholder="例：64" oninput="refreshCode()">
+        <input type="text" id="inSeason" maxlength="2" inputmode="numeric" placeholder="例：64" oninput="refreshCode()" onblur="checkSeason()">
         <div class="em" id="eSeason">請輸入正確的 2 碼數字（0–9）</div>
       </div>
 
@@ -222,6 +230,25 @@ function refreshCode() {
     (/^\d{2}$/.test(s) && c !== '') ? '41'+s+c+peekSN(s,c) : '— — — — — — — —';
 }
 
+// ── Season mismatch warning ──
+function checkSeason() {
+  const s = document.getElementById('inSeason').value;
+  if (!/^\d{2}$/.test(s) || products.length === 0) return;
+  const existing = [...new Set(products.map(p => p.code.slice(2,4)))];
+  if (!existing.includes(s)) {
+    const ok = confirm(
+      '⚠️ 季別提醒\n\n' +
+      '目前已有季別「' + existing.join('、') + '」的採購記錄，\n' +
+      '你輸入的是季別「' + s + '」。\n\n' +
+      '確定要使用季別「' + s + '」繼續輸入嗎？'
+    );
+    if (!ok) {
+      document.getElementById('inSeason').value = '';
+      refreshCode();
+    }
+  }
+}
+
 // ── Photo ──
 function onPhoto(input) {
   const file = input.files[0];
@@ -249,7 +276,8 @@ function closeModal() {
 }
 function resetForm() {
   photoB64 = null; photoExt = 'jpeg';
-  document.getElementById('fileIn').value = '';
+  document.getElementById('fileCamera').value = '';
+  document.getElementById('fileAlbum').value = '';
   const img = document.getElementById('pimg');
   img.src = ''; img.style.display = 'none';
   document.getElementById('pzt').style.display = 'block';

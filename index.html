@@ -454,7 +454,18 @@ async function doExport() {
     const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const d  = new Date();
     const ds = d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
-    saveAs(blob, '採購記錄_'+ds+'.xlsx');
+    const filename = '採購記錄_'+ds+'.xlsx';
+
+    // iOS：用 Web Share API（分享選單可存到「檔案」app）
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], filename, {type: blob.type});
+      if (navigator.canShare({files: [file]})) {
+        await navigator.share({files: [file], title: '採購記錄'});
+        return;
+      }
+    }
+    // 桌機：直接下載
+    saveAs(blob, filename);
   } catch(e) {
     alert('產生 Excel 時發生錯誤：' + e.message);
     console.error(e);
